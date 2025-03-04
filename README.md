@@ -1,153 +1,45 @@
-# ==============================
-# Importing Required Libraries
-# ==============================
-import numpy as np
-import pandas as pd
-import seaborn as sns
-from sklearn.preprocessing import MinMaxScaler
-import datetime as dt
-from datetime import datetime
+Project Description: RFM Segmentation for Customer Analytics
+Overview
+This project focuses on customer segmentation using RFM (Recency, Frequency, Monetary) analysis to identify key customer groups for targeted marketing strategies. The dataset contains customer transaction data from an e-commerce company, including online and offline purchases.
 
-# ==============================
-# Configuring Pandas Display Settings
-# ==============================
-pd.set_option('display.max_columns', None)
-pd.set_option('display.float_format', lambda x: '%.3f' % x)
+Goals
+The main objectives of this analysis are:
 
-# ==============================
-# Loading the Dataset
-# ==============================
-df_ = pd.read_csv("datasets/flo_data_20k.csv")
-df = df_.copy()
+Understand customer purchasing behavior through exploratory data analysis (EDA).
+Calculate RFM metrics to evaluate customer value.
+Segment customers based on their purchasing patterns.
+Identify high-value customers for targeted marketing campaigns.
+Export customer lists for specific marketing strategies.
+Key Steps
+Data Loading & Preprocessing
 
-# ==============================
-# Exploratory Data Analysis (EDA) Function
-# ==============================
-def check_df(dataframe, head=10):
-    print("##################### Shape #####################")
-    print(dataframe.shape)
-    print("##################### Types #####################")
-    print(dataframe.dtypes)
-    print("##################### Head #####################")
-    print(dataframe.head(head))
-    print("##################### Tail #####################")
-    print(dataframe.tail(head))
-    print("##################### NA #####################")
-    print(dataframe.isnull().sum())
-    print("##################### Quantiles #####################")
-    print(dataframe.describe([0, 0.05, 0.50, 0.95, 0.99, 1]).T)
+Import the dataset.
+Check for missing values, data types, and summary statistics.
+Create total order and total customer value columns.
+Convert date columns to datetime format.
+Exploratory Data Analysis (EDA)
 
-# Run EDA function
-check_df(df)
+Summarize customer behavior by different order channels.
+Identify top customers based on total spending and order count.
+RFM Calculation
 
-# ==============================
-# Creating New Features
-# ==============================
-df["total_order_num"] = df["order_num_total_ever_online"] + df["order_num_total_ever_offline"]
-df["total_customer_value"] = df["customer_value_total_ever_offline"] + df["customer_value_total_ever_online"]
+![image](https://github.com/user-attachments/assets/9b194aa0-fc32-471a-854a-8b36c6077e5d)
 
-# ==============================
-# Converting Date Columns to DateTime Format
-# ==============================
-date_columns = ["first_order_date", "last_order_date", "last_order_date_online", "last_order_date_offline"]
-for col in date_columns:
-    df[col] = pd.to_datetime(df[col])
 
-# ==============================
-# Aggregating Data by Order Channel
-# ==============================
-df.groupby("order_channel").agg({
-    "master_id": "count",
-    "total_order_num": "sum",
-    "total_customer_value": "sum"
-})
+Define Recency (days since last purchase), Frequency (total purchases), and Monetary (total spending).
+Assign RFM scores using quantile-based binning.
+Generate an RF score (combination of recency and frequency scores).
+Customer Segmentation
 
-# ==============================
-# Identifying Top Customers
-# ==============================
-# Top 10 Customers by Total Customer Value
-df[["master_id", "total_customer_value"]].sort_values(by="total_customer_value", ascending=False)[:10]
+![image](https://github.com/user-attachments/assets/55169cf1-6750-4f42-8be1-ff2be9d23e3a)
 
-# Top 10 Customers by Total Order Number
-df[["master_id", "total_order_num"]].sort_values(by="total_order_num", ascending=False)[:10]
 
-# ==============================
-# RFM Segmentation
-# ==============================
-# Defining Analysis Date
-df["last_order_date"].max()
-today_date = dt.datetime(2021, 6, 1)  # In practice, the company provides the analysis date.
+Apply RFM segmentation rules to categorize customers (e.g., Champions, Loyal Customers, At-Risk, New Customers).
+Group and summarize customer behavior per segment.
+Exporting Target Customer Lists
 
-# Creating RFM Table
-rfm = df.groupby("master_id").agg({
-    "last_order_date": lambda last_order_date: (today_date - last_order_date.max()).days,
-    "total_order_num": lambda total_order_num: total_order_num,
-    "total_customer_value": lambda total_customer_value: total_customer_value
-})
-
-# Renaming Columns
-rfm.columns = ["recency", "frequency", "monetary"]
-
-# ==============================
-# Calculating RFM Scores
-# ==============================
-rfm["recency_score"] = pd.qcut(rfm["recency"], 5, labels=[5, 4, 3, 2, 1])
-rfm["frequency_score"] = pd.qcut(rfm["frequency"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5])
-rfm["monetary_score"] = pd.qcut(rfm["monetary"], 5, labels=[1, 2, 3, 4, 5])
-
-# Creating RF Score
-rfm["RF_SCORE"] = rfm["recency_score"].astype(str) + rfm["frequency_score"].astype(str)
-
-# ==============================
-# Mapping RFM Segments
-# ==============================
-seg_map = {
-    r'[1-2][1-2]': 'hibernating',
-    r'[1-2][3-4]': 'at_Risk',
-    r'[1-2]5': 'cant_loose',
-    r'3[1-2]': 'about_to_sleep',
-    r'33': 'need_attention',
-    r'[3-4][4-5]': 'loyal_customers',
-    r'41': 'promising',
-    r'51': 'new_customers',
-    r'[4-5][2-3]': 'potential_loyalists',
-    r'5[4-5]': 'champions'
-}
-
-rfm["segment"] = rfm["RF_SCORE"].replace(seg_map, regex=True)
-
-# Segment-wise Statistics
-rfm.groupby("segment").agg({
-    "recency": "mean",
-    "frequency": "mean",
-    "monetary": "mean"
-})
-
-# ==============================
-# Merging RFM with Additional Customer Data
-# ==============================
-df = df.reset_index(drop=True)
-rfm = rfm.reset_index(drop=True)
-
-rfm["interested_in_categories_12"] = df["interested_in_categories_12"]
-rfm["master_id"] = df["master_id"]
-
-# ==============================
-# Exporting Target Customer Lists
-# ==============================
-# Targeting High-Value Customers for New Brand
-yeni_marka_hedef_müşteri_id = rfm.loc[
-    (rfm["segment"].isin(["champions", "loyal_customers"])) & 
-    (rfm["interested_in_categories_12"] == "[KADIN]"),
-    ["master_id"]
-]
-
-yeni_marka_hedef_müşteri_id.to_csv("yeni_marka_hedef_müşteri_id.csv")
-
-# Targeting Customers for Discount Offers
-indirim_hedef_müşteri_ids = rfm.loc[
-    (rfm["segment"].isin(["cant_loose", "hibernating", "new_customers"])), 
-    ["master_id"]
-]
-
-indirim_hedef_müşteri_ids.to_csv("indirim_hedef_müşteri_ids.csv")
+Identify high-value customers (Champions, Loyal Customers) interested in specific categories.
+Identify at-risk customers for discount-based campaigns.
+Save customer IDs to CSV files for further marketing actions.
+Expected Outcome
+This analysis helps businesses personalize marketing strategies by targeting the right customer segments, optimizing promotions, and increasing customer retention.

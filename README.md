@@ -7,7 +7,7 @@ This project focuses on customer segmentation using RFM (Recency, Frequency, Mon
 ### Goals
 The main objectives of this analysis are:
 
-<ul> Understand customer purchasing behavior through exploratory data analysis (EDA).
+Understand customer purchasing behavior through exploratory data analysis (EDA).
 
 Calculate RFM metrics to evaluate customer value.
 
